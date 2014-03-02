@@ -87,36 +87,41 @@ summary(m)
 log_code <- '
 data {
   int<lower=0> N;
-  real x[N];
-  int<lower=0, upper=1> y[N];
+  int<lower=0, upper=1> admit[N];
+  vector[N] gre;
+  vector[N] gpa;
 }
 parameters {
-  real alpha;
-  real beta;
+  vector[3] beta;
 }
 model {
-  for (n in 1:N)
-    y[n] ~ bernoulli(inv_logit(alpha + beta * x[n]));
+  admit ~ bernoulli_logit(beta[1] + beta[2] * gre + beta[3] * gpa);
 }
 '
 log_data <- list(
       N = nrow(d)
-    , y = d$admit
-    , x = d$gre
+    , admit = d$admit
+    , gre = d$gre
+    , gpa = d$gpa
     )
 
-bm <- stan(model_code=log_code, data=log_data, iter=1000, chains=4)
-summary(bm)$summary
+m <- glm(admit ~ gre + gpa, data=d, family=binomial(logit))
 summary(m)
+
+bm <- stan(model_code=log_code, data=log_data, iter=4000, chains=4)
+summary(bm)$summary
 
 msd.l <- model_data(bm)
 msd.l$.id <- 'unsure'
 
 msd.l <- msd.l[msd.l$variable != 'lp__',]
 
+msd.l$variable <- str_replace(msd.l$variable, '\\[', '.')
+msd.l$variable <- str_replace(msd.l$variable, '\\]', '')
+msd.l$variable <- factor(msd.l$variable)
 
 msdd.l <- dcast(.id + variable ~ varname, data=msd.l[msd.l$varname != 'sim',], value.var='value')
 names(msdd.l) <- str_replace(names(msdd.l), '%', 'pc')
 names(msdd.l) <- str_replace(names(msdd.l), '(^[0-9])', 'b\\1')
 
-ggplot(msd.l) + geom_histogram(aes(value, fill=.id), data=msd.l[msd.l$varname == 'sim',]) + facet_wrap(~variable, scales='free') + geom_vline(aes(xintercept=mean), linetype='dotted', data=msdd.l) + geom_segment(aes(x=b2.5pc, xend=b97.5pc, y=0, yend=0), data=msdd.l) + theme_bw()
+ggplot(msd.l) + geom_histogram(aes(value, fill=.id), data=msd.l[msd.l$varname == 'sim',]) + facet_wrap(~variable) + geom_vline(aes(xintercept=mean), linetype='dotted', data=msdd.l) + geom_segment(aes(x=b2.5pc, xend=b97.5pc, y=0, yend=0), data=msdd.l) + theme_bw()
