@@ -73,8 +73,50 @@ msdd <- model_summary(msd)
 ggplot(msd) + geom_histogram(aes(value, fill=.id), data=msd[msd$varname == 'sim',]) + facet_wrap(~.id) + geom_vline(aes(xintercept=mean), linetype='dotted', data=msdd) + geom_segment(aes(x=b2.5pc, xend=b97.5pc, y=0, yend=0), data=msdd) + theme_bw()
 
 
-msdd <- dcast(.id ~ varname, data=msd[msd$varname != 'sim',])
-names(msdd) <- str_replace(names(msdd), '%', 'pc')
-names(msdd) <- str_replace(names(msdd), '(^[0-9])', 'b\\1')
+##########################
+## Logistic regression. ##
+##########################
 
-ggplot(msd) + geom_density(aes(value, color=.id), data=msd[msd$varname == 'sim',]) + facet_wrap(~.id) + geom_vline(aes(xintercept=mean), linetype='dotted', data=msdd) + geom_segment(aes(x=b2.5pc, xend=b97.5pc, y=0, yend=0), data=msdd) + theme_bw()
+d <- read.csv("http://www.ats.ucla.edu/stat/data/binary.csv")
+
+head(d)
+
+m <- glm(admit ~ gre, data=d, family=binomial(logit))
+summary(m)
+
+log_code <- '
+data {
+  int<lower=0> N;
+  real x[N];
+  int<lower=0, upper=1> y[N];
+}
+parameters {
+  real alpha;
+  real beta;
+}
+model {
+  for (n in 1:N)
+    y[n] ~ bernoulli(inv_logit(alpha + beta * x[n]));
+}
+'
+log_data <- list(
+      N = nrow(d)
+    , y = d$admit
+    , x = d$gre
+    )
+
+bm <- stan(model_code=log_code, data=log_data, iter=1000, chains=4)
+summary(bm)$summary
+summary(m)
+
+msd.l <- model_data(bm)
+msd.l$.id <- 'unsure'
+
+msd.l <- msd.l[msd.l$variable != 'lp__',]
+
+
+msdd.l <- dcast(.id + variable ~ varname, data=msd.l[msd.l$varname != 'sim',], value.var='value')
+names(msdd.l) <- str_replace(names(msdd.l), '%', 'pc')
+names(msdd.l) <- str_replace(names(msdd.l), '(^[0-9])', 'b\\1')
+
+ggplot(msd.l) + geom_histogram(aes(value, fill=.id), data=msd.l[msd.l$varname == 'sim',]) + facet_wrap(~variable, scales='free') + geom_vline(aes(xintercept=mean), linetype='dotted', data=msdd.l) + geom_segment(aes(x=b2.5pc, xend=b97.5pc, y=0, yend=0), data=msdd.l) + theme_bw()
