@@ -10,43 +10,6 @@ library(plyr)
 library(reshape2)
 set_cppo('fast')
 
-###############################
-## Example 1: eight schools. ##
-###############################
-
-schools_code <- "
-  data {
-    int<lower=0> J; // number of schools
-    real y[J]; // estimated treatment effects
-    real<lower=0> sigma[J]; // s.e. of effect estimates
-}
-parameters {
-    real mu;
-    real<lower=0> tau;
-    real eta[J];
-}
-transformed parameters {
-    real theta [J];
-    for (j in 1: J)
-       theta[j] <- mu + tau * eta[j];
-}
-model {
-    eta ~ normal(0, 1);
-    y ~ normal(theta, sigma);
-}
-"
-schools_dat <- list(J = 8,
-                    y = c(28, 8, -3, 7, -1, 1, 18, 12),
-                    sigma = c(15, 10, 16, 11, 9, 11, 10, 18)
-                    )
-
-## fit the model
-fit <- stan(model_code = schools_code, data=schools_dat, iter=1000, chains=4)
-
-## inspecting the fitted model
-print(fit)
-plot(fit)
-
 ########################################
 ## Bernoulli example from the manual. ##
 ########################################
